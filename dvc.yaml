@@ -1,0 +1,15 @@
+stages:
+  train:
+    cmd: python src/train.py
+    deps:
+    - data/v1/data.csv
+    - src/train.py
+    params:
+    - data_path
+    - max_depth
+    - n_estimators
+    - random_state
+    - test_size
+    outs:
+    - artifacts/metrics.json
+    - artifacts/model.joblib

@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+.dvc/tmp/
+.dvc/cache/
+.DS_Store

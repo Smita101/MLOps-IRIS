@@ -1,10 +1,10 @@
-name: CI (main)
+name: CI (dev)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ dev ]
 
 jobs:
   test:
@@ -29,6 +29,7 @@ jobs:
           pip install --only-binary=:all: numpy
           pip install -r requirements.txt
 
+      # Authenticate to GCP using the JSON in your secret
       - name: Auth to Google Cloud
         id: auth
         uses: google-github-actions/auth@v2
@@ -38,12 +39,14 @@ jobs:
       - name: Install gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      # Make ADC visible to anything (dvc/gcsfs) that reads GOOGLE_APPLICATION_CREDENTIALS
       - name: Export ADC path
         run: echo "GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
 
       - name: DVC pull (fetch data & model)
         run: dvc pull -v
 
+      # Adjust these if your repo uses different filenames/paths
       - name: Set evaluation env
         run: |
           echo "EVAL_DATA_PATH=data/iris.csv" >> $GITHUB_ENV
@@ -53,6 +56,7 @@ jobs:
       - name: Run tests (pytest)
         run: pytest -q
 
+      # Optional: generate a tiny metrics.json for a neat CML comment
       - name: Quick eval → metrics.json
         run: |
           python - <<'PY'
@@ -61,6 +65,7 @@ jobs:
           data = os.getenv("EVAL_DATA_PATH", "data/iris.csv")
           modelp = os.getenv("MODEL_PATH", "models/model.pkl")
           if not (os.path.exists(data) and os.path.exists(modelp)):
+              # create a minimal placeholder so CML still posts something
               with open("metrics.json","w") as f: json.dump({"status":"skipped"}, f)
               raise SystemExit(0)
           df = pd.read_csv(data)
@@ -89,6 +94,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: iterative/setup-cml@v2
 
+      # 2) Build the markdown and post/update the PR comment
       - name: Post CML PR comment
         if: github.event_name == 'pull_request'
         env:
@@ -106,9 +112,5 @@ jobs:
           fi
           } > report.md
 
-    
-          cml comment update report.md --pr --publish || cml comment create report.md --pr --publish        
-
-        
-
-      
+     
+          cml comment update report.md --pr --publish || cml comment create report.md --pr --publish 
