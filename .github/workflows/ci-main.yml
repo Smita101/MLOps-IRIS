@@ -103,4 +103,3 @@ jobs:
           $(cat metrics.json 2>/dev/null || echo '{"status":"missing"}')
           ```
           EOF
-
