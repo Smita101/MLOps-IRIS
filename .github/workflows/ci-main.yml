@@ -89,17 +89,24 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: iterative/setup-cml@v2
 
-      - name: CML PR comment
+      - name: Prepare CML report
         if: github.event_name == 'pull_request'
-        env:
-          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cml comment --publish --pr <<'EOF'
-          ## CI (main) Report
-          **Branch:** main
+          cat > cml_report.md <<'MD'
+          ## CI (${{ github.ref_name }}) Report
+          **Branch:** ${{ github.ref_name }}
 
           **metrics.json:**
           ```json
           $(cat metrics.json 2>/dev/null || echo '{"status":"missing"}')
           ```
-          EOF
+          MD
+
+      - name: CML PR comment
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Try to update if a comment already exists; otherwise create a new one
+          cml comment update cml_report.md --pr --publish || cml comment create cml_report.md --pr --publish
+
