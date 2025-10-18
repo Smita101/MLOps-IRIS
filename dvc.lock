@@ -1,0 +1,29 @@
+schema: '2.0'
+stages:
+  train:
+    cmd: python src/train.py
+    deps:
+    - path: data/v1/data.csv
+      hash: md5
+      md5: 4954d4088152604322732f13c4e14691
+      size: 2606
+    - path: src/train.py
+      hash: md5
+      md5: 2d6762d87c58b68e7f4f3a4d2d704c0e
+      size: 1741
+    params:
+      params.yaml:
+        data_path: data/v2/data.csv
+        max_depth:
+        n_estimators: 200
+        random_state: 42
+        test_size: 0.2
+    outs:
+    - path: artifacts/metrics.json
+      hash: md5
+      md5: 4958cbd40c01f674fd4aa264f81684ca
+      size: 40
+    - path: artifacts/model.joblib
+      hash: md5
+      md5: 51391d7b5049ade784c315d59a475351
+      size: 196145
