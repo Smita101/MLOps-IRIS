@@ -6,7 +6,8 @@ joblib==1.3.2
 
 # tests + dvc
 pytest==8.1.1
-dvc[gcs]==3.54.0
+dvc[gs]==3.54.0
+
 
 
 
