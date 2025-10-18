@@ -9,6 +9,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -80,19 +84,22 @@ jobs:
           path: metrics.json
           if-no-files-found: ignore
 
+      - name: Setup CML
+        if: github.event_name == 'pull_request'
+        uses: iterative/setup-cml@v2
+
       - name: CML PR comment
         if: github.event_name == 'pull_request'
-        uses: iterative/cml@v0
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: >
-            comment --publish --pr
-            --markdown "## CI (main) Report
-            \n**Branch:** main
-            \n
-            \n**metrics.json:** 
-            \n\`\`\`json
-            $(cat metrics.json 2>/dev/null || echo '{"status":"missing"}')
-            \n\`\`\`
-            "
+        run: |
+          cml comment --publish --pr <<'EOF'
+          ## CI (main) Report
+          **Branch:** main
+
+          **metrics.json:**
+          ```json
+          $(cat metrics.json 2>/dev/null || echo '{"status":"missing"}')
+          ```
+          EOF
+
