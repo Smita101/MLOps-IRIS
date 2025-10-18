@@ -97,15 +97,12 @@ jobs:
       - name: Prepare CML report
         if: github.event_name == 'pull_request'
         run: |
-         cat > cml_report.md <<'MD'
-         ## CI (${{ github.ref_name }}) Report
-         **Branch:** ${{ github.ref_name }}
-
-         **metrics.json:**
-         ```json
-         $(cat metrics.json 2>/dev/null || echo '{"status":"missing"}')
-         ```
-         MD
+          echo "### CI Report" > report.md
+          echo "**Branch:** $GITHUB_REF_NAME" >> report.md
+          echo "" >> report.md
+          echo "**metrics.json:**" >> report.md
+          cat metrics.json >> report.md || echo '{"status":"missing"}' >> report.md
+          cml comment --publish --pr report.md
 
       - name: CML PR comment
         if: github.event_name == 'pull_request'
