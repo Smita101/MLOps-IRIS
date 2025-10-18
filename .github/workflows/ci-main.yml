@@ -92,18 +92,23 @@ jobs:
       - name: Prepare CML report
         if: github.event_name == 'pull_request'
         run: |
-          echo "### CI Report" > report.md
-          echo "**Branch:** $GITHUB_REF_NAME" >> report.md
-          echo "" >> report.md
-          echo "**metrics.json:**" >> report.md
-          cat metrics.json >> report.md || echo '{"status":"missing"}' >> report.md
-          cml comment --publish --pr report.md
-
+          {
+          echo "## CI report"
+          echo "**Branch:** $GITHUB_REF_NAME"
+          echo
+          echo "**metrics.json:**"
+          if [ -f metrics.json ]; then
+            cat metrics.json
+          else
+            echo '{"status":"missing"}'
+          fi
+          } > report.md     
+          
       - name: CML PR comment
         if: github.event_name == 'pull_request'
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Try to update if a comment already exists; otherwise create a new one
-          cml comment update cml_report.md --pr --publish || cml comment create cml_report.md --pr --publish
+          cml comment update report.md --pr --publish || cml comment create report.md --pr --publish
 
