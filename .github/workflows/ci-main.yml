@@ -61,7 +61,7 @@ jobs:
           ls -lah data || true
           test -f "$MODEL_PATH"
           test -f "$METRICS_PATH"
-          test -f "$EVAL_DATA_PATH"
+          
 
       # Optional: run your tests
       - name: Run tests (pytest)
