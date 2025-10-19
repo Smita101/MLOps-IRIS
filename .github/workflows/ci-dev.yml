@@ -7,63 +7,88 @@ on:
     branches: [ dev ]
 
 jobs:
-  ci:
+  test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
     env:
+      # Match your repo & dvc.yaml
       DVC_REMOTE_NAME: gcs
       MODEL_PATH: artifacts/model.joblib
       METRICS_PATH: artifacts/metrics.json
+      EVAL_DATA_PATH: data/eval/iris_eval.csv
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
+          cache: "pip"
 
-      - name: Install deps (project + DVC + CML)
+      - name: Install dependencies (project + DVC)
         run: |
           python -m pip install --upgrade pip
+          pip install --only-binary=:all: numpy
           pip install -r requirements.txt || true
-          pip install dvc dvc-gs pytest cml
+          pip install dvc dvc-gs pytest
 
-      - name: Auth for GCS (DVC)
-        run: |
-          echo "$GCP_SA_KEY_BASE64" | base64 -d > "$RUNNER_TEMP/sa.json"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> $GITHUB_ENV
-        env:
-          GCP_SA_KEY_BASE64: ${{ secrets.GCP_SA_KEY_BASE64 }}
+      # Auth via ADC using your service account JSON secret
+      - name: Auth to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: DVC pull artifacts
+      - name: Install gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Export ADC path for DVC/GCS
+        run: echo "GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
+
+      - name: DVC pull (fetch data, model, metrics)
         run: |
           dvc remote list
           dvc pull -r "$DVC_REMOTE_NAME" -v
 
-      - name: Sanity check required files (fail fast if missing)
+      - name: Sanity check required files (fail fast)
         run: |
           ls -lah artifacts || true
+          ls -lah data || true
           test -f "$MODEL_PATH"
           test -f "$METRICS_PATH"
+          test -f "$EVAL_DATA_PATH"
 
-      - name: Run tests (optional)
+      # Optional: run tests
+      - name: Run tests (pytest)
         run: pytest -q || true
 
+      # Prepare CML report from the DVC-tracked metrics file
       - name: Prepare CI report (CML)
         run: |
-          echo "CI report" > report.md
-          echo "" >> report.md
-          echo "**Branch:** $GITHUB_REF_NAME" >> report.md
-          echo "" >> report.md
-          echo "**metrics.json:**" >> report.md
-          cat "$METRICS_PATH" >> report.md
+          {
+            echo "## CI report (dev)"
+            echo
+            echo "**Branch:** $GITHUB_REF_NAME"
+            echo
+            echo "**artifacts/metrics.json:**"
+            cat "$METRICS_PATH"
+          } > report.md
 
-      - name: Post PR comment (CML)
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: Setup CML
+        if: github.event_name == 'pull_request'
+        uses: iterative/setup-cml@v2
+
+      - name: Post CML PR comment
+        if: github.event_name == 'pull_request'
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: cml comment create --pr --publish report.md
+        run: |
+          cml comment update report.md --pr --publish || cml comment create report.md --pr --publish
 
       - name: Upload report (push runs)
         if: ${{ github.event_name != 'pull_request' }}
