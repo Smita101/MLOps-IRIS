@@ -1,0 +1,11 @@
+md5: a9dc3db76965f16cac08c275f0574f92
+frozen: true
+deps:
+- checksum: W/"37d56bfac305c449ac32008733db6b43"
+  hash: md5
+  path: https://github.com/IITMBSMLOps/ga_resources/blob/week_1/data/v2/data.csv
+outs:
+- md5: 0e3bb6d54bfe8a4d9168095de33d59e5
+  size: 185969
+  hash: md5
+  path: data.csv
