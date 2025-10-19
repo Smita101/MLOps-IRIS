@@ -9,8 +9,8 @@ stages:
       size: 2606
     - path: src/train.py
       hash: md5
-      md5: 2d6762d87c58b68e7f4f3a4d2d704c0e
-      size: 1741
+      md5: f9f4281adc563c24e94a70b1b94b4455
+      size: 1622
     params:
       params.yaml:
         data_path: data/v2/data.csv
@@ -25,5 +25,5 @@ stages:
       size: 40
     - path: artifacts/model.joblib
       hash: md5
-      md5: 51391d7b5049ade784c315d59a475351
+      md5: e1145545b8da6c7178dd18c134d4fb40
       size: 196145
