@@ -1,0 +1,13 @@
+md5: d7cd75f3ebf7e8ddd86aa331b8386d0d
+frozen: true
+deps:
+- checksum: '"4272bb7ee694e1bf9a064e70bb80655705ffc8b851499a697cb76dab3cc1e347"'
+  hash: md5
+  path: 
+    https://raw.githubusercontent.com/IITMBSMLOps/ga_resources/week_1/data/v1/data.csv
+  size: 2606
+outs:
+- md5: 4954d4088152604322732f13c4e14691
+  size: 2606
+  hash: md5
+  path: data.csv
