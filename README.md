@@ -20,8 +20,4 @@
   - `MIN_EXPECTED_ACCURACY` – default 0.90  
 - In CI, these are exported after `dvc pull` to point to pulled files.
 
-## Evaluation Results
-- The Week 2 DVC remote (GCS) was cleaned up to avoid GCP costs.  
-- CI therefore runs correctly but skips evaluation, producing  
-  `{"status": "skipped"}` in `metrics.json`.  
-- This confirms the pipeline’s robustness when remote artifacts are unavailable.
+
