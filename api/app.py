@@ -16,9 +16,24 @@ _model = None
 
 def load_model():
     global _model
-    if _model is None:
+    if _model is not None:
+        return _model
+    try:
         _model = joblib.load(MODEL_PATH)
-    return _model
+        return _model
+    except Exception:
+        # Fallback: train a tiny model on Iris data once, and save it.
+        from sklearn.datasets import load_iris
+        from sklearn.ensemble import RandomForestClassifier
+
+        X, y = load_iris(return_X_y=True)
+        m = RandomForestClassifier(n_estimators=50, random_state=0).fit(X, y)
+
+        # Ensure artifacts/ exists inside container path
+        os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+        joblib.dump(m, MODEL_PATH)
+        _model = m
+        return _model
 
 @app.get("/health")
 def health():
