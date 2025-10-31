@@ -1,0 +1,8 @@
+.dvc/
+data/
+tests/
+.github/
+*.md
+*.log
+__pycache__/
+*.ipynb
