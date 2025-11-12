@@ -29,6 +29,14 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Debug env + list clusters
+        run: |
+          gcloud container clusters get-credentials "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}"
+          kubectl -n "${NAMESPACE}" get deploy iris-infer
+          kubectl -n "${NAMESPACE}" get svc iris-infer
+          kubectl -n "${NAMESPACE}" get hpa iris-infer || true
+ 
+
       - name: Get GKE credentials
         run: |
           gcloud container clusters get-credentials "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}"
