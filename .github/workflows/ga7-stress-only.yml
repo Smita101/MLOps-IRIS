@@ -1,1 +1,148 @@
-<put the GA7 - Stress Test Only workflow I gave you earlier here, unchanged>
+name: GA7 - Stress Test Only (no build/deploy)
+
+on:
+  workflow_dispatch: {}
+
+env:
+  PROJECT_ID: noted-robot-472906-h9
+  REGION: us-central1
+  CLUSTER_NAME: ga7-autopilot
+  NAMESPACE: iris-ga7
+  ARTIFACT_BUCKET: mlops-iris-artifacts-smita
+
+jobs:
+  stress-only:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to GCP (Service Account JSON)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud + kubectl
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}"
+          kubectl -n "${NAMESPACE}" get deploy iris-infer
+          kubectl -n "${NAMESPACE}" get svc iris-infer
+          kubectl -n "${NAMESPACE}" get hpa iris-infer || true
+
+      - name: wrk Lua config (ConfigMap; safe to re-apply)
+        run: |
+          cat > iris.lua <<'LUA'
+          wrk.method = "POST"
+          wrk.headers["Content-Type"] = "application/json"
+          local body = '{"instances":[[5.8,2.7,5.1,1.9],[5.1,3.5,1.4,0.2]]}'
+          request = function()
+            return wrk.format(nil, "/predict", nil, body)
+          end
+          LUA
+          kubectl -n "${NAMESPACE}" create configmap wrk-script --from-file=iris.lua --dry-run=client -o yaml | kubectl apply -f -
+
+      # ---- 1) AUTOSCALING RUN: 1200 concurrency (expect scale up if HPA allows) ----
+      - name: Run wrk @1200
+        run: |
+          kubectl -n "${NAMESPACE}" delete job wrk-1k --ignore-not-found
+          kubectl -n "${NAMESPACE}" apply -f - <<'YAML'
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: wrk-1k
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: wrk
+                    image: alpine:3.19
+                    command: ["/bin/sh","-c"]
+                    args: ["apk add --no-cache wrk && wrk -t8 -c1200 -d60s -s /scripts/iris.lua http://iris-infer"]
+                    volumeMounts: [{ name: scripts, mountPath: /scripts }]
+                volumes:
+                  - name: scripts
+                    configMap:
+                      name: wrk-script
+                      items: [{ key: iris.lua, path: iris.lua }]
+          YAML
+          kubectl -n "${NAMESPACE}" wait --for=condition=complete job/wrk-1k --timeout=600s
+          kubectl -n "${NAMESPACE}" logs job/wrk-1k | tee wrk-1k.txt
+          kubectl -n "${NAMESPACE}" get hpa | tee hpa-after-1k.txt || true
+          kubectl -n "${NAMESPACE}" get deploy/iris-infer | tee deploy-after-1k.txt
+
+      # ---- 2) BOTTLENECK RUN: lock to 1 pod + 2000 concurrency ----
+      - name: Lock HPA to 1 and scale down
+        run: |
+          kubectl -n "${NAMESPACE}" patch hpa iris-infer --type merge -p '{"spec":{"minReplicas":1,"maxReplicas":1}}' || true
+          kubectl -n "${NAMESPACE}" scale deploy/iris-infer --replicas=1
+          kubectl -n "${NAMESPACE}" rollout status deploy/iris-infer
+          kubectl -n "${NAMESPACE}" get hpa | tee hpa-locked.txt || true
+          kubectl -n "${NAMESPACE}" get deploy/iris-infer | tee deploy-1pod.txt
+
+      - name: Run wrk @2000
+        run: |
+          kubectl -n "${NAMESPACE}" delete job wrk-2k --ignore-not-found
+          kubectl -n "${NAMESPACE}" apply -f - <<'YAML'
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: wrk-2k
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: wrk
+                    image: alpine:3.19
+                    command: ["/bin/sh","-c"]
+                    args: ["apk add --no-cache wrk && wrk -t8 -c2000 -d60s -s /scripts/iris.lua http://iris-infer"]
+                    volumeMounts: [{ name: scripts, mountPath: /scripts }]
+                volumes:
+                  - name: scripts
+                    configMap:
+                      name: wrk-script
+                      items: [{ key: iris.lua, path: iris.lua }]
+          YAML
+          kubectl -n "${NAMESPACE}" wait --for=condition=complete job/wrk-2k --timeout=600s
+          kubectl -n "${NAMESPACE}" logs job/wrk-2k | tee wrk-2k.txt
+
+      - name: Restore HPA back to 1..3 (if HPA exists)
+        if: always()
+        run: |
+          kubectl -n "${NAMESPACE}" patch hpa iris-infer --type merge -p '{"spec":{"minReplicas":1,"maxReplicas":3}}' || true
+          kubectl -n "${NAMESPACE}" get hpa | tee hpa-after-unlock.txt || true
+          kubectl -n "${NAMESPACE}" describe hpa iris-infer | tee hpa-describe.txt || true
+
+      - name: Upload artifacts to GitHub
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ga7-results-stress-only
+          path: |
+            wrk-1k.txt
+            wrk-2k.txt
+            hpa-after-1k.txt
+            deploy-after-1k.txt
+            hpa-locked.txt
+            deploy-1pod.txt
+            hpa-after-unlock.txt
+            hpa-describe.txt
+
+      - name: Copy artifacts to GCS
+        if: always()
+        run: |
+          TS="ga7/run-${{ github.run_id }}-${{ github.run_attempt }}"
+          mkdir -p out && cp -f *.txt out/ || true
+          gcloud storage cp -r out "gs://${ARTIFACT_BUCKET}/${TS}/" || gsutil -m cp -r out "gs://${ARTIFACT_BUCKET}/${TS}/"
+          echo "Artifacts: gs://${ARTIFACT_BUCKET}/${TS}/"
+
