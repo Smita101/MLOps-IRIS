@@ -19,33 +19,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Authenticate with your GCP Service Account
       - name: Auth to GCP (Service Account JSON)
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # Set up gcloud CLI
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ env.PROJECT_ID }}    
+          project_id: ${{ env.PROJECT_ID }}
 
+      # Install kubectl
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
         with:
           version: 'latest'
 
-      - name: Enable GKE auth plugin
-        run: echo "USE_GKE_GCLOUD_AUTH_PLUGIN=True" >> $GITHUB_ENV
-    
-
-      - name: Debug env + list clusters
-        run: |
-          gcloud container clusters get-credentials "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}"
-          kubectl -n "${NAMESPACE}" get deploy iris-infer
-          kubectl -n "${NAMESPACE}" get svc iris-infer
-          kubectl -n "${NAMESPACE}" get hpa iris-infer || true
- 
-
+      # Fetch GKE cluster credentials (handles auth plugin internally)
       - name: Get GKE credentials
         uses: google-github-actions/get-gke-credentials@v2
         with:
@@ -53,12 +45,14 @@ jobs:
           location: ${{ env.REGION }}
           project_id: ${{ env.PROJECT_ID }}
 
+      # Verify cluster connection
       - name: Check cluster objects
         run: |
           kubectl -n "${NAMESPACE}" get deploy iris-infer
           kubectl -n "${NAMESPACE}" get svc iris-infer
           kubectl -n "${NAMESPACE}" get hpa iris-infer || true    
 
+      # ConfigMap with wrk Lua script
       - name: wrk Lua config (ConfigMap; safe to re-apply)
         run: |
           cat > iris.lua <<'LUA'
@@ -139,6 +133,7 @@ jobs:
           kubectl -n "${NAMESPACE}" wait --for=condition=complete job/wrk-2k --timeout=600s
           kubectl -n "${NAMESPACE}" logs job/wrk-2k | tee wrk-2k.txt
 
+      # Restore autoscaling back to normal
       - name: Restore HPA back to 1..3 (if HPA exists)
         if: always()
         run: |
@@ -146,6 +141,7 @@ jobs:
           kubectl -n "${NAMESPACE}" get hpa | tee hpa-after-unlock.txt || true
           kubectl -n "${NAMESPACE}" describe hpa iris-infer | tee hpa-describe.txt || true
 
+      # Upload artifacts to GitHub
       - name: Upload artifacts to GitHub
         uses: actions/upload-artifact@v4
         if: always()
@@ -161,6 +157,7 @@ jobs:
             hpa-after-unlock.txt
             hpa-describe.txt
 
+      # Copy results to your GCS bucket
       - name: Copy artifacts to GCS
         if: always()
         run: |
