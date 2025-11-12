@@ -9,8 +9,8 @@ env:
   CLUSTER_NAME: ga7-autopilot
   NAMESPACE: iris-ga7
   ARTIFACT_BUCKET: mlops-iris-artifacts-smita
-  GKE_CLUSTER: ${CLUSTER_NAME}
-  GKE_LOCATION: ${REGION}
+  GKE_CLUSTER: ${{ env.CLUSTER_NAME }}
+  GKE_LOCATION: ${{ env.REGION }}
 
 jobs:
   stress-only:
@@ -30,6 +30,15 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
+
+      - name: Debug env + list clusters
+        run: |
+          echo "PROJECT_ID=${PROJECT_ID}"
+          echo "REGION=${REGION}"
+          echo "CLUSTER_NAME=${CLUSTER_NAME}"
+          echo "GKE_CLUSTER=${GKE_CLUSTER}"
+          echo "GKE_LOCATION=${GKE_LOCATION}"
+          gcloud container clusters list --project "${PROJECT_ID}" || true    
 
       - name: Get GKE credentials
         run: |
