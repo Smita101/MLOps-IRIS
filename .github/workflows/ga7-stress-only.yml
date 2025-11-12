@@ -28,6 +28,12 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
+          install_components: true
+          components: gke-gcloud-auth-plugin,kubectl
+
+      - name: Enable GKE auth plugin
+        run: echo "USE_GKE_GCLOUD_AUTH_PLUGIN=True" >> $GITHUB_ENV
+    
 
       - name: Debug env + list clusters
         run: |
