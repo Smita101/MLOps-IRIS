@@ -9,6 +9,8 @@ env:
   CLUSTER_NAME: ga7-autopilot
   NAMESPACE: iris-ga7
   ARTIFACT_BUCKET: mlops-iris-artifacts-smita
+  GKE_CLUSTER: ${CLUSTER_NAME}
+  GKE_LOCATION: ${REGION}
 
 jobs:
   stress-only:
