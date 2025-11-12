@@ -31,10 +31,11 @@ jobs:
 
       - name: Debug env + list clusters
         run: |
-          echo "PROJECT_ID=${PROJECT_ID}"
-          echo "REGION=${REGION}"
-          echo "CLUSTER_NAME=${CLUSTER_NAME}"
-          gcloud container clusters list --project "${PROJECT_ID}" || true   
+          gcloud container clusters get-credentials "${CLUSTER_NAME}" --region "${REGION}" --project "${PROJECT_ID}"
+          kubectl -n "${NAMESPACE}" get deploy iris-infer
+          kubectl -n "${NAMESPACE}" get svc iris-infer
+          kubectl -n "${NAMESPACE}" get hpa iris-infer || true
+ 
 
       - name: Get GKE credentials
         run: |
