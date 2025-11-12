@@ -1,1 +1,3 @@
-<put the GA7 - Build, Deploy, Stress Test workflow I gave you earlier here, unchanged>
+name: GA7 
+on:
+  workflow_dispatch: {}
