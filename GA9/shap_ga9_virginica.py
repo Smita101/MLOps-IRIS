@@ -3,6 +3,7 @@ from pathlib import Path
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def main():
@@ -38,9 +39,18 @@ def main():
     # Create SHAP explainer for tree-based model
     explainer = shap.TreeExplainer(clf)
 
-    # For multi-class classifiers, shap_values is a list: one array per class
+    # For multi-class classifiers, shap_values can be:
+    #  - a list of arrays (one per class), OR
+    #  - a single 3D array (n_samples, n_features, n_classes) or (n_classes, n_samples, n_features)
     print("Computing SHAP values for full dataset...")
     shap_values = explainer.shap_values(X)
+
+    # Inspect type / shape for debugging
+    print(f"type(shap_values): {type(shap_values)}")
+    if isinstance(shap_values, np.ndarray):
+        print(f"shap_values.shape: {shap_values.shape}")
+    else:
+        print(f"len(shap_values): {len(shap_values)}")
 
     # Find index of class 'virginica'
     class_labels = clf.classes_
@@ -56,8 +66,40 @@ def main():
 
     print(f"Index for class 'virginica': {virginica_index}")
 
-    # SHAP values for class 'virginica'
-    shap_virginica = shap_values[virginica_index]
+    # ---- Handle different SHAP output formats ----
+    if isinstance(shap_values, list):
+        # Standard old behaviour: list of arrays, one per class
+        shap_virginica = shap_values[virginica_index]
+    else:
+        # Newer behaviour: single ndarray, likely 3D
+        sv = shap_values
+        if sv.ndim == 3:
+            # Try (n_samples, n_features, n_classes)
+            if sv.shape[0] == X.shape[0] and sv.shape[1] == X.shape[1]:
+                shap_virginica = sv[:, :, virginica_index]
+            # Try (n_classes, n_samples, n_features)
+            elif sv.shape[0] == len(class_labels) and sv.shape[2] == X.shape[1]:
+                shap_virginica = sv[virginica_index, :, :]
+            else:
+                raise ValueError(
+                    f"Unexpected shap_values shape {sv.shape} for SHAP. "
+                    "Cannot align with feature matrix X."
+                )
+        else:
+            raise ValueError(
+                f"Unsupported shap_values ndim={sv.ndim}. "
+                "Expected list or 3D numpy array."
+            )
+
+    print("shap_virginica.shape:", getattr(shap_virginica, "shape", None))
+    print("X.shape:", X.shape)
+
+    # Final sanity check
+    if shap_virginica.shape[0] != X.shape[0] or shap_virginica.shape[1] != X.shape[1]:
+        raise ValueError(
+            f"Mismatch between SHAP values shape {shap_virginica.shape} "
+            f"and X shape {X.shape}."
+        )
 
     # Create summary plot for class virginica
     plt.figure()
@@ -78,3 +120,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
